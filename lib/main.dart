@@ -52,7 +52,11 @@ class SoraHomePage extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _DeviceHeader(status: state.status, ip: state.ip),
+                _DeviceHeader(
+                  status: state.status,
+                  ip: state.ip,
+                  mode: state.mode,
+                ),
                 const SizedBox(height: 16),
                 Expanded(
                   child: Row(
@@ -77,10 +81,15 @@ class SoraHomePage extends ConsumerWidget {
 }
 
 class _DeviceHeader extends StatelessWidget {
-  const _DeviceHeader({required this.status, required this.ip});
+  const _DeviceHeader({
+    required this.status,
+    required this.ip,
+    required this.mode,
+  });
 
   final String status;
   final String ip;
+  final String mode;
 
   @override
   Widget build(BuildContext context) {
@@ -100,6 +109,7 @@ class _DeviceHeader extends StatelessWidget {
                 Text('Статус: $status',
                     style: Theme.of(context).textTheme.titleMedium),
                 Text('IP: $ip'),
+                Text('Режим: $mode'),
               ],
             ),
           ],

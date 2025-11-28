@@ -13,10 +13,24 @@ class _DeviceControlPanelState extends ConsumerState<DeviceControlPanel> {
   String _selectedMode = 'Auto';
   bool _busy = false;
 
+  @override
+  void initState() {
+    super.initState();
+    ref.listen<AsyncValue>(soraStateProvider, (previous, next) {
+      next.whenData((state) {
+        if (!_busy && _selectedMode != state.mode) {
+          setState(() => _selectedMode = state.mode);
+        }
+      });
+    });
+  }
+
   Future<void> _sendCommand(String cmd) async {
     setState(() => _busy = true);
     try {
       await ref.read(soraApiProvider).sendCommand(cmd);
+      ref.read(soraApiProvider).refreshStatus();
+      await ref.read(telemetryProvider.notifier).refresh();
     } finally {
       setState(() => _busy = false);
     }
