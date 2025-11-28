@@ -10,7 +10,7 @@
 
 ## Структура проекта
 - `lib/main.dart` — точка входа, навигация и основной экран.
-- `lib/services/sora_api.dart` — слой работы с API (пока мок-данные и заглушки для HTTP-запросов).
+- `lib/services/sora_api.dart` — слой работы с API (реальные HTTP-вызовы к контроллеру Sora-2 Pro).
 - `lib/models/device_state.dart` — модели состояния устройства и телеметрии.
 - `lib/widgets/` — виджеты панелей управления и телеметрии.
 
@@ -21,7 +21,14 @@
    flutter pub get
    flutter run
    ```
-3. Замените заглушки в `SoraApi` на реальные HTTP-вызовы к контроллеру Sora-2 Pro и настройте адрес подключения.
+3. Перед запуском укажите адрес контроллера и креденшелы для Basic Auth через `--dart-define` (они попадут в `SoraApiConfig`):
+   ```bash
+   flutter run \
+     --dart-define=SORA_API_BASE_URL=https://192.168.0.88 \
+     --dart-define=SORA_API_USER=admin \
+     --dart-define=SORA_API_PASS=secret
+   ```
+4. Реализация `SoraApi` уже использует реальные HTTP-вызовы к контроллеру Sora-2 Pro, остаётся только подставить ваши адрес и креденшелы.
 
 ## Дальнейшее развитие
 - Реализовать авторизацию и безопасное хранение токенов.
