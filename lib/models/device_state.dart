@@ -1,39 +1,36 @@
-class DeviceState {
-  const DeviceState({
+class SoraVideo {
+  const SoraVideo({
+    required this.id,
     required this.status,
-    required this.ip,
-    required this.mode,
+    this.downloadUrl,
+    this.previewUrl,
+    this.prompt,
+    this.durationSeconds,
+    this.aspectRatio,
   });
 
-  factory DeviceState.fromJson(Map<String, dynamic> json) {
-    return DeviceState(
+  factory SoraVideo.fromJson(Map<String, dynamic> json) {
+    final metadata = json['metadata'] as Map<String, dynamic>?;
+    return SoraVideo(
+      id: json['id'] as String? ?? '-',
       status: json['status'] as String? ?? 'unknown',
-      ip: json['ip'] as String? ?? '-',
-      mode: json['mode'] as String? ?? 'Manual',
+      downloadUrl: json['download_url'] as String? ?? metadata?['download_url'] as String?,
+      previewUrl: json['preview_url'] as String? ?? metadata?['preview_url'] as String?,
+      prompt: json['prompt'] as String? ?? metadata?['prompt'] as String?,
+      durationSeconds:
+          (json['duration'] as num?)?.toInt() ?? (metadata?['duration'] as num?)?.toInt(),
+      aspectRatio: json['aspect_ratio'] as String? ?? metadata?['aspect_ratio'] as String?,
     );
   }
 
+  final String id;
   final String status;
-  final String ip;
-  final String mode;
-}
+  final String? downloadUrl;
+  final String? previewUrl;
+  final String? prompt;
+  final int? durationSeconds;
+  final String? aspectRatio;
 
-class Telemetry {
-  const Telemetry({
-    required this.temperature,
-    required this.battery,
-    required this.signal,
-  });
-
-  factory Telemetry.fromJson(Map<String, dynamic> json) {
-    return Telemetry(
-      temperature: (json['temperature'] as num?)?.toDouble() ?? 0,
-      battery: (json['battery'] as num?)?.toInt() ?? 0,
-      signal: (json['signal'] as num?)?.toInt() ?? 0,
-    );
-  }
-
-  final double temperature;
-  final int battery;
-  final int signal;
+  bool get isFinished => status.toLowerCase() == 'completed';
+  bool get isRunning => status.toLowerCase() == 'running';
 }

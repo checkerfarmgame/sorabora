@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,43 +7,35 @@ import 'package:sora2_pro_app/models/device_state.dart';
 final soraApiProvider = Provider<SoraApi>(
   (ref) => SoraApi(ref, config: const SoraApiConfig.fromEnvironment()),
 );
-final soraStateProvider = FutureProvider<DeviceState>((ref) async {
-  final api = ref.read(soraApiProvider);
-  return api.fetchStatus();
-});
 
-final telemetryProvider = StateNotifierProvider<TelemetryNotifier, AsyncValue<Telemetry>>(
-  (ref) => TelemetryNotifier(ref.read(soraApiProvider)),
+final soraJobProvider = StateNotifierProvider<SoraJobNotifier, AsyncValue<SoraVideo?>>(
+  (ref) => SoraJobNotifier(ref.read(soraApiProvider)),
 );
 
 class SoraApiConfig {
   const SoraApiConfig({
     required this.baseUrl,
-    required this.username,
-    required this.password,
+    required this.apiKey,
   });
 
   /// Reads credentials from `--dart-define` flags.
   ///
   /// Set them when running the app, for example:
-  /// `flutter run --dart-define=SORA_API_BASE_URL=https://192.168.0.88 --dart-define=SORA_API_USER=admin --dart-define=SORA_API_PASS=secret`
+  /// `flutter run --dart-define=OPENAI_BASE_URL=https://api.openai.com/v1 --dart-define=OPENAI_API_KEY=sk-...`
   const SoraApiConfig.fromEnvironment({
-    String defaultBaseUrl = 'https://controller.example.com',
-    String defaultUsername = 'admin',
-    String defaultPassword = 'password',
-  })  : baseUrl = const String.fromEnvironment('SORA_API_BASE_URL', defaultValue: defaultBaseUrl),
-        username = const String.fromEnvironment('SORA_API_USER', defaultValue: defaultUsername),
-        password = const String.fromEnvironment('SORA_API_PASS', defaultValue: defaultPassword);
+    String defaultBaseUrl = 'https://api.openai.com/v1',
+    String defaultApiKey = 'sk-REPLACE_ME',
+  })  : baseUrl =
+            const String.fromEnvironment('OPENAI_BASE_URL', defaultValue: defaultBaseUrl),
+        apiKey = const String.fromEnvironment('OPENAI_API_KEY', defaultValue: defaultApiKey);
 
   final String baseUrl;
-  final String username;
-  final String password;
+  final String apiKey;
 
   Map<String, String> buildHeaders() {
-    final basicAuth = base64Encode(utf8.encode('$username:$password'));
     return <String, String>{
       'Content-Type': 'application/json',
-      'Authorization': 'Basic $basicAuth',
+      'Authorization': 'Bearer $apiKey',
     };
   }
 }
@@ -60,34 +51,34 @@ class SoraApi {
 
   Uri _buildUri(String path) => Uri.parse('${_config.baseUrl}$path');
 
-  Future<DeviceState> fetchStatus() async {
-    final response = await _client.get(
-      _buildUri('/api/status'),
-      headers: _config.buildHeaders(),
-    );
-
-    final body = _validateResponse(response);
-    return DeviceState.fromJson(body);
-  }
-
-  Future<Telemetry> fetchTelemetry() async {
-    final response = await _client.get(
-      _buildUri('/api/telemetry'),
-      headers: _config.buildHeaders(),
-    );
-
-    final body = _validateResponse(response);
-    return Telemetry.fromJson(body);
-  }
-
-  Future<void> sendCommand(String command) async {
+  Future<SoraVideo> createVideo({
+    required String prompt,
+    int durationSeconds = 5,
+    String aspectRatio = '16:9',
+  }) async {
     final response = await _client.post(
-      _buildUri('/api/command'),
+      _buildUri('/videos'),
       headers: _config.buildHeaders(),
-      body: jsonEncode(<String, String>{'command': command}),
+      body: jsonEncode(<String, dynamic>{
+        'model': 'sora-2',
+        'prompt': prompt,
+        'duration': durationSeconds,
+        'aspect_ratio': aspectRatio,
+      }),
     );
 
-    _validateResponse(response);
+    final body = _validateResponse(response);
+    return SoraVideo.fromJson(body);
+  }
+
+  Future<SoraVideo> fetchVideo(String id) async {
+    final response = await _client.get(
+      _buildUri('/videos/$id'),
+      headers: _config.buildHeaders(),
+    );
+
+    final body = _validateResponse(response);
+    return SoraVideo.fromJson(body);
   }
 
   Map<String, dynamic> _validateResponse(http.Response response) {
@@ -96,26 +87,41 @@ class SoraApi {
       return decoded is Map<String, dynamic> ? decoded : <String, dynamic>{};
     }
 
-    throw Exception('Sora API responded with ${response.statusCode}: ${response.body}');
-  }
-
-  void refreshStatus() {
-    ref.refresh(soraStateProvider.future);
+    throw Exception('OpenAI responded with ${response.statusCode}: ${response.body}');
   }
 }
 
-class TelemetryNotifier extends StateNotifier<AsyncValue<Telemetry>> {
-  TelemetryNotifier(this.api) : super(const AsyncValue.loading()) {
-    refresh();
-  }
+class SoraJobNotifier extends StateNotifier<AsyncValue<SoraVideo?>> {
+  SoraJobNotifier(this.api) : super(const AsyncValue.data(null));
 
   final SoraApi api;
 
-  Future<void> refresh() async {
+  Future<void> createJob({
+    required String prompt,
+    required int durationSeconds,
+    required String aspectRatio,
+  }) async {
     state = const AsyncValue.loading();
     try {
-      final data = await api.fetchTelemetry();
-      state = AsyncValue.data(data);
+      final video = await api.createVideo(
+        prompt: prompt,
+        durationSeconds: durationSeconds,
+        aspectRatio: aspectRatio,
+      );
+      state = AsyncValue.data(video);
+    } catch (err, stack) {
+      state = AsyncValue.error(err, stack);
+    }
+  }
+
+  Future<void> refreshJob() async {
+    final current = state.value;
+    if (current == null) return;
+
+    state = const AsyncValue.loading();
+    try {
+      final video = await api.fetchVideo(current.id);
+      state = AsyncValue.data(video);
     } catch (err, stack) {
       state = AsyncValue.error(err, stack);
     }
